@@ -12,6 +12,5 @@ RUN cd /tmp/cache ; cargo build
 
 ADD . ./src
 RUN cp -Rp /tmp/cache/target /src
-RUN cd /src ; cargo build
 
 CMD cd /src ; cargo test
