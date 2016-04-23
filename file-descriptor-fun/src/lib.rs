@@ -63,13 +63,15 @@ mod filedes {
 mod filedes_ring {
     use filedes;
     use nix;
+    use nix::sys::socket;
+    use nix::sys::uio::IoVec;
     use std::fmt;
     use std::os::unix::io::RawFd;
 
     pub struct Ring {
         read: RawFd,
         write: RawFd,
-        count: u64,
+        pub count: u64,
     }
 
     impl fmt::Display for Ring {
@@ -105,6 +107,27 @@ mod filedes_ring {
             write: write,
             count: 0,
         });
+    }
+
+    impl Ring {
+        // Adds an FD to a Ring. Closing the FD to free up resources is left to the caller.
+        pub fn add(&mut self, fd: RawFd) -> Result<(), Error> {
+            let buf = vec![IoVec::from_slice("!".as_bytes())];
+
+            let fds = vec![fd];
+            let cmsgs = vec![socket::ControlMessage::ScmRights(fds.as_slice())];
+            match socket::sendmsg(self.write,
+                                  &buf.as_slice(),
+                                  cmsgs.as_slice(),
+                                  socket::MsgFlags::empty(),
+                                  None) {
+                Ok(_) => {
+                    self.count += 1;
+                    Ok(())
+                }
+                Err(e) => Err(From::from(e)),
+            }
+        }
     }
 }
 
@@ -178,6 +201,7 @@ mod filedes_tests {
 
 #[cfg(test)]
 mod ring_tests {
+    use filedes;
     use filedes_ring;
 
     #[test]
@@ -193,17 +217,32 @@ mod ring_tests {
 
         while !limit_reached {
             match filedes_ring::new() {
-                Ok(_) => {},
-                Err(filedes_ring::Error::Bad(err)) => { panic!(err); }
+                Ok(_) => {}
+                Err(filedes_ring::Error::Bad(err)) => {
+                    panic!(err);
+                }
 
                 // This ends up matching just shortly before the
                 // $`ulimit -n` / 2$ mark: We're creating socket
                 // pairs, after all!
-                Err(filedes_ring::Error::Limit(_)) => { limit_reached = true; }
+                Err(filedes_ring::Error::Limit(_)) => {
+                    limit_reached = true;
+                }
             }
             count += 1;
         }
         println!("Reached the limit at {} ring buffers", count);
         assert!(limit_reached);
     }
+
+    #[test]
+    fn adding_to_ring_works() {
+        let mut ring = filedes_ring::new().unwrap();
+        let (one, two) = filedes::unix_socket_pair().unwrap();
+        ring.add(one).unwrap();
+        assert_eq!(1, ring.count);
+        ring.add(two).unwrap();
+        assert_eq!(2, ring.count);
+    }
+
 }
