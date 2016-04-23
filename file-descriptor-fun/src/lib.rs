@@ -5,7 +5,7 @@ extern crate nix;
 
 mod filedes {
     use nix::sys::socket;
-    use std::path::{Path,PathBuf};
+    use std::path::{Path, PathBuf};
     use std::fs;
     use std::io;
     use nix;
@@ -31,7 +31,10 @@ mod filedes {
     }
 
     pub fn server_socket(path: &str) -> Result<RawFd, nix::Error> {
-        let socket = try!(socket::socket(socket::AddressFamily::Unix, SOCKET_TYPE, socket::SockFlag::empty(), SOCKET_PROTO));
+        let socket = try!(socket::socket(socket::AddressFamily::Unix,
+                                         SOCKET_TYPE,
+                                         socket::SockFlag::empty(),
+                                         SOCKET_PROTO));
         let sockaddr = try!(make_socket_addr(path));
         try!(socket::bind(socket, &sockaddr));
         try!(socket::listen(socket, MAX_BACKLOG_QUEUE));
@@ -39,11 +42,24 @@ mod filedes {
     }
 
     pub fn connect_to_socket(path: &str) -> Result<RawFd, nix::Error> {
-        let socket = try!(socket::socket(socket::AddressFamily::Unix, SOCKET_TYPE, socket::SockFlag::empty(), SOCKET_PROTO));
+        let socket = try!(socket::socket(socket::AddressFamily::Unix,
+                                         SOCKET_TYPE,
+                                         socket::SockFlag::empty(),
+                                         SOCKET_PROTO));
         let sockaddr = try!(make_socket_addr(path));
         try!(socket::connect(socket, &sockaddr));
         Ok(socket)
     }
+
+    // Creates a socketpair in the UNIX domain and returns it
+    pub fn unix_socket_pair() -> Result<(RawFd, RawFd), nix::Error> {
+        return socket::socketpair(socket::AddressFamily::Unix,
+                                  SOCKET_TYPE,
+                                  SOCKET_PROTO,
+                                  socket::SockFlag::empty());
+    }
+}
+
 mod filedes_ring {
     use filedes;
     use nix;
