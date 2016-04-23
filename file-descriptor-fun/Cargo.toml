@@ -1,5 +1,5 @@
 [package]
-name = "file-descriptor-fun"
+name = "filedes"
 version = "0.1.0"
 authors = ["Andreas Fuchs <asf@boinkor.net>"]
 

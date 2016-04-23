@@ -1,5 +1,5 @@
 [root]
-name = "file-descriptor-fun"
+name = "filedes"
 version = "0.1.0"
 dependencies = [
  "nix 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
