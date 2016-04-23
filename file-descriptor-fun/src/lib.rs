@@ -44,10 +44,47 @@ mod filedes {
         try!(socket::connect(socket, &sockaddr));
         Ok(socket)
     }
+mod filedes_ring {
+    use filedes;
+    use nix;
+    use std::os::unix::io::RawFd;
+
+    pub struct Ring {
+        read: RawFd,
+        write: RawFd,
+    }
+
+    #[derive(Debug)]
+    pub enum Error {
+        // A real error that prevents the Ring buffer from working
+        Bad(nix::Error),
+
+        // An error that indicates some limit being reached. This is sometimes expected and realistic!
+        Limit(nix::Error),
+    }
+
+    impl From<nix::Error> for Error {
+        fn from(err: nix::Error) -> Error {
+            match err {
+                nix::Error::Sys(nix::errno::Errno::EMFILE) => Error::Limit(err),
+                nix::Error::Sys(_) => Error::Bad(err),
+                nix::Error::InvalidPath => Error::Bad(err),
+            }
+        }
+    }
+
+    // Create a new Ring with a UNIX domain socket pair.
+    pub fn new() -> Result<Ring, Error> {
+        let (read, write) = try!(filedes::unix_socket_pair());
+        return Ok(Ring {
+            read: read,
+            write: write,
+        });
+    }
 }
 
 #[cfg(test)]
-mod tests {
+mod filedes_tests {
     use filedes;
     use std::str;
     use std::thread;
@@ -87,20 +124,60 @@ mod tests {
         thread::spawn(move || {
             let conn = socket::accept(s_sock).unwrap();
 
-            let buf = vec!(IoVec::from_slice("!".as_bytes()));
+            let buf = vec![IoVec::from_slice("!".as_bytes())];
 
-            let fds = vec!(conn);
-            let cmsgs = vec!(socket::ControlMessage::ScmRights(fds.as_slice()));
-            socket::sendmsg(conn, &buf.as_slice(), cmsgs.as_slice(), socket::MsgFlags::empty(), None).unwrap();
+            let fds = vec![conn];
+            let cmsgs = vec![socket::ControlMessage::ScmRights(fds.as_slice())];
+            socket::sendmsg(conn,
+                            &buf.as_slice(),
+                            cmsgs.as_slice(),
+                            socket::MsgFlags::empty(),
+                            None)
+                .unwrap();
             unistd::close(s_sock).unwrap();
         });
         let sock = filedes::connect_to_socket("mysock3").unwrap();
 
-        let mut backing_buf = vec!(0);
-        let mut buf = vec!(IoVec::from_mut_slice(&mut backing_buf));
+        let mut backing_buf = vec![0];
+        let mut buf = vec![IoVec::from_mut_slice(&mut backing_buf)];
         let mut cmsg: socket::CmsgSpace<([RawFd; 15])> = socket::CmsgSpace::new();
-        let msg = socket::recvmsg(sock, &mut buf.as_mut_slice(), Some(&mut cmsg), socket::MsgFlags::empty()).unwrap();
+        let msg = socket::recvmsg(sock,
+                                  &mut buf.as_mut_slice(),
+                                  Some(&mut cmsg),
+                                  socket::MsgFlags::empty())
+                      .unwrap();
         assert_eq!(1, msg.cmsgs().count());
 
+    }
+}
+
+#[cfg(test)]
+mod ring_tests {
+    use filedes_ring;
+
+    #[test]
+    fn it_can_create_a_ringbuffer() {
+        filedes_ring::new().unwrap();
+    }
+
+    #[test]
+    fn it_can_create_many_ringbuffers() {
+        let mut limit_reached = false;
+        let mut count = 0;
+
+        while !limit_reached {
+            match filedes_ring::new() {
+                Ok(_) => {},
+                Err(filedes_ring::Error::Bad(err)) => { panic!(err); }
+
+                // This ends up matching just shortly before the
+                // $`ulimit -n` / 2$ mark: We're creating socket
+                // pairs, after all!
+                Err(filedes_ring::Error::Limit(_)) => { limit_reached = true; }
+            }
+            count += 1;
+        }
+        println!("Reached the limit at {}", count);
+        assert!(limit_reached);
     }
 }
