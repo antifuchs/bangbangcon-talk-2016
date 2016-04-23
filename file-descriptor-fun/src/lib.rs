@@ -56,7 +56,7 @@ mod filedes {
         return socket::socketpair(socket::AddressFamily::Unix,
                                   SOCKET_TYPE,
                                   SOCKET_PROTO,
-                                  socket::SockFlag::empty());
+                                  socket::SOCK_NONBLOCK);
     }
 }
 
@@ -65,8 +65,12 @@ mod filedes_ring {
     use nix;
     use nix::sys::socket;
     use nix::sys::uio::IoVec;
+    use nix::unistd;
     use std::fmt;
     use std::os::unix::io::RawFd;
+
+    // OS X doesn't let us go beyond 256kB for the buffer size, so this is the max:
+    const SEND_BUF_SIZE: usize = (512-64) * 1024;
 
     pub struct Ring {
         read: RawFd,
@@ -77,6 +81,14 @@ mod filedes_ring {
     impl fmt::Display for Ring {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             write!(f, "#<Ring containing {} fds>", self.count)
+        }
+    }
+
+    impl Drop for Ring {
+        fn drop(&mut self) {
+            //println!("Dropping sockets holding {} fds", self.count);
+            unistd::close(self.write).unwrap();
+            unistd::close(self.read).unwrap();
         }
     }
 
@@ -93,6 +105,8 @@ mod filedes_ring {
         fn from(err: nix::Error) -> Error {
             match err {
                 nix::Error::Sys(nix::errno::Errno::EMFILE) => Error::Limit(err),
+                nix::Error::Sys(nix::errno::Errno::EAGAIN) => Error::Limit(err),
+                nix::Error::Sys(nix::errno::Errno::ENFILE) => Error::Limit(err),
                 nix::Error::Sys(_) => Error::Bad(err),
                 nix::Error::InvalidPath => Error::Bad(err),
             }
@@ -102,6 +116,9 @@ mod filedes_ring {
     // Create a new Ring with a UNIX domain socket pair.
     pub fn new() -> Result<Ring, Error> {
         let (read, write) = try!(filedes::unix_socket_pair());
+        // Adjust limits:
+        let buf_size: usize = SEND_BUF_SIZE;
+        try!(socket::setsockopt(write, socket::sockopt::SndBuf, &buf_size));
         return Ok(Ring {
             read: read,
             write: write,
@@ -203,36 +220,13 @@ mod filedes_tests {
 mod ring_tests {
     use filedes;
     use filedes_ring;
+    use nix;
+    use std::os::unix::io::RawFd;
 
     #[test]
     fn it_can_create_a_ringbuffer() {
         let ring = filedes_ring::new().unwrap();
         println!("Got a ring: {}", ring);
-    }
-
-    #[test]
-    fn it_can_create_many_ringbuffers() {
-        let mut limit_reached = false;
-        let mut count = 0;
-
-        while !limit_reached {
-            match filedes_ring::new() {
-                Ok(_) => {}
-                Err(filedes_ring::Error::Bad(err)) => {
-                    panic!(err);
-                }
-
-                // This ends up matching just shortly before the
-                // $`ulimit -n` / 2$ mark: We're creating socket
-                // pairs, after all!
-                Err(filedes_ring::Error::Limit(_)) => {
-                    limit_reached = true;
-                }
-            }
-            count += 1;
-        }
-        println!("Reached the limit at {} ring buffers", count);
-        assert!(limit_reached);
     }
 
     #[test]
@@ -245,4 +239,58 @@ mod ring_tests {
         assert_eq!(2, ring.count);
     }
 
+    #[test]
+    fn adding_many_to_a_ring_works() {
+        let mut ring = filedes_ring::new().unwrap();
+
+        loop {
+            let (one, two) = filedes::unix_socket_pair().unwrap();
+            match ring.add(one) {
+                Ok(()) => {
+                    nix::unistd::close(one).unwrap();
+                }
+                Err(filedes_ring::Error::Limit(e)) => {
+                    println!("I hit {}", e);
+                    nix::unistd::close(one).unwrap();
+                    break;
+                }
+                Err(e) => {
+                    panic!(e);
+                }
+            }
+            match ring.add(two) {
+                Ok(()) => {
+                    nix::unistd::close(two).unwrap();
+                },
+                Err(filedes_ring::Error::Limit(e)) => {
+                    println!("I hit {}", e);
+                    nix::unistd::close(two).unwrap();
+                    break;
+                }
+                Err(e) => {
+                    panic!(e);
+                }
+            }
+        }
+        let mut additional_fds: Vec<RawFd> = vec!();
+        loop {
+            match filedes::unix_socket_pair() {
+                Ok((one, two)) => {
+                    additional_fds.push(one);
+                    additional_fds.push(two);
+                }
+                Err(e) => {
+                    println!("Hit {}, aborting", e);
+                    break;
+                }
+            }
+
+        }
+        println!("I managed to store a bunch of FDs in {}", ring);
+        println!("...and I opened {} FDs", additional_fds.len());
+        assert!(additional_fds.len() > 0);
+        for fd in additional_fds {
+            nix::unistd::close(fd).unwrap();
+        }
+    }
 }
