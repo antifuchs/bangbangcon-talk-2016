@@ -6,7 +6,7 @@ use std::fmt;
 use std::os::unix::io::RawFd;
 
 // OS X doesn't let us go beyond 256kB for the buffer size, so this is the max:
-const SEND_BUF_SIZE: usize = (512-64) * 1024;
+const SEND_BUF_SIZE: usize = (512 - 64) * 1024;
 
 pub struct Ring {
     read: RawFd,
@@ -22,10 +22,21 @@ impl fmt::Display for Ring {
 
 impl Drop for Ring {
     fn drop(&mut self) {
-        //println!("Dropping sockets holding {} fds", self.count);
+        // println!("Dropping sockets holding {} fds", self.count);
         unistd::close(self.write).unwrap();
         unistd::close(self.read).unwrap();
     }
+}
+
+// Any sort of error that can occur while trying to speak the ring
+// buffer protocol
+#[derive(Copy, PartialEq, Eq, Clone, Debug)]
+pub enum ProtocolError {
+    // Expected to receive an FD, but did not get one
+    NoFDReceived,
+
+    // Expected one FD, got more
+    TooManyFDsReceived,
 }
 
 #[derive(Debug)]
@@ -35,6 +46,9 @@ pub enum Error {
 
     // An error that indicates some limit being reached. This is sometimes expected and realistic!
     Limit(nix::Error),
+
+    // A protocol error (e.g., messages on the socket didn't have the right format)
+    Protocol(ProtocolError),
 }
 
 impl From<nix::Error> for Error {
@@ -67,6 +81,12 @@ pub fn new() -> Result<Ring, Error> {
 impl Ring {
     // Adds an FD to a Ring. Closing the FD to free up resources is left to the caller.
     pub fn add(&mut self, fd: RawFd) -> Result<(), Error> {
+        try!(self.insert(fd));
+        self.count += 1;
+        Ok(())
+    }
+
+    fn insert(&self, fd: RawFd) -> Result<(), Error> {
         let buf = vec![IoVec::from_slice("!".as_bytes())];
 
         let fds = vec![fd];
@@ -76,11 +96,67 @@ impl Ring {
                               cmsgs.as_slice(),
                               socket::MsgFlags::empty(),
                               None) {
-            Ok(_) => {
-                self.count += 1;
-                Ok(())
-            }
+            Ok(_) => Ok(()),
             Err(e) => Err(From::from(e)),
+        }
+    }
+
+    fn next(&self) -> Result<RawFd, Error> {
+        let mut backing_buf = vec![0];
+        let mut buf = vec![IoVec::from_mut_slice(&mut backing_buf)];
+        let mut cmsg: socket::CmsgSpace<([RawFd; 15])> = socket::CmsgSpace::new();
+        match socket::recvmsg(self.read,
+                              &mut buf.as_mut_slice(),
+                              Some(&mut cmsg),
+                              socket::MsgFlags::empty()) {
+            Ok(msg) => {
+                match msg.cmsgs().next() {
+                    Some(socket::ControlMessage::ScmRights(fd)) => {
+                        // TODO: this could probably handle the case of multiple FDs via buffers
+                        match fd.len() {
+                            1 => {
+                                let the_fd = fd[0];
+                                try!(self.insert(the_fd));
+                                Ok(the_fd)
+                            }
+                            0 => Err(Error::Protocol(ProtocolError::NoFDReceived)),
+                            _ => Err(Error::Protocol(ProtocolError::TooManyFDsReceived)),
+                        }
+                    }
+                    Some(_) => Err(Error::Protocol(ProtocolError::NoFDReceived)),
+                    None => Err(Error::Protocol(ProtocolError::NoFDReceived)),
+                }
+            }
+
+            Err(e) => Err(From::from(e)),
+        }
+    }
+
+    pub fn iter(&self) -> RingIter {
+        RingIter {
+            ring: &self,
+            offset: 0,
+        }
+    }
+}
+
+// An iterator over the File descriptors contained in an FD ring buffer
+pub struct RingIter<'a> {
+    ring: &'a Ring,
+    offset: u64,
+}
+
+impl<'a> Iterator for RingIter<'a> {
+    type Item = RawFd;
+
+    fn next(&mut self) -> Option<RawFd> {
+        self.offset += 1;
+        if self.offset > self.ring.count {
+            return None;
+        }
+        match self.ring.next() {
+            Ok(next_fd) => Some(next_fd),
+            Err(_) => None,
         }
     }
 }

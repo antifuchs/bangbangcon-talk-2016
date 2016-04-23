@@ -73,4 +73,12 @@ fn adding_many_to_a_ring_works() {
     for fd in additional_fds {
         nix::unistd::close(fd).unwrap();
     }
+
+    let should_close = ring.count;
+    let mut closed = 0;
+    for fd in ring.iter() {
+        closed += 1;
+        nix::unistd::close(fd).unwrap();
+    }
+    assert_eq!(should_close, closed);
 }
