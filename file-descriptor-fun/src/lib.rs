@@ -11,6 +11,9 @@ mod filedes {
     const BASE_PATH: &'static str = "/tmp/filedes_fun/";
     const MAX_BACKLOG_QUEUE: usize = 265;
 
+    const SOCKET_TYPE: socket::SockType = socket::SockType::Stream;
+    const SOCKET_PROTO: nix::c_int = 0;
+
     // Setup the directory they'll live in.
     pub fn setup() -> io::Result<()> {
         fs::create_dir_all(Path::new(self::BASE_PATH))
@@ -25,7 +28,7 @@ mod filedes {
     }
 
     pub fn server_socket(path: &str) -> Result<RawFd, nix::Error> {
-        let socket = try!(socket::socket(socket::AddressFamily::Unix, socket::SockType::Stream, socket::SockFlag::empty(), 0));
+        let socket = try!(socket::socket(socket::AddressFamily::Unix, SOCKET_TYPE, socket::SockFlag::empty(), SOCKET_PROTO));
         let sockaddr = try!(make_socket_addr(path));
         try!(socket::bind(socket, &sockaddr));
         try!(socket::listen(socket, MAX_BACKLOG_QUEUE));
@@ -33,7 +36,7 @@ mod filedes {
     }
 
     pub fn connect_to_socket(path: &str) -> Result<RawFd, nix::Error> {
-        let socket = try!(socket::socket(socket::AddressFamily::Unix, socket::SockType::Stream, socket::SockFlag::empty(), 0));
+        let socket = try!(socket::socket(socket::AddressFamily::Unix, SOCKET_TYPE, socket::SockFlag::empty(), SOCKET_PROTO));
         let sockaddr = try!(make_socket_addr(path));
         try!(socket::connect(socket, &sockaddr));
         Ok(socket)
