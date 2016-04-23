@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := help
 
 test: ## Run the test suite
-	rm -f /tmp/filedes_fun/mysock* ; env RUST_BACKTRACE=1 cargo test
+	rm -f /tmp/filedes_fun/mysock* ; env RUST_BACKTRACE=1 cargo test -- --nocapture
 
 dockertest: ## Run the test suite in a docker container
 	docker build -t current .
