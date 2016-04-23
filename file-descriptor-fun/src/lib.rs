@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![deny(warnings)]
+
 extern crate nix;
 
 mod filedes {
