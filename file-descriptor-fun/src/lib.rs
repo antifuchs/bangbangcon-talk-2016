@@ -63,11 +63,19 @@ mod filedes {
 mod filedes_ring {
     use filedes;
     use nix;
+    use std::fmt;
     use std::os::unix::io::RawFd;
 
     pub struct Ring {
         read: RawFd,
         write: RawFd,
+        count: u64,
+    }
+
+    impl fmt::Display for Ring {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            write!(f, "#<Ring containing {} fds>", self.count)
+        }
     }
 
     #[derive(Debug)]
@@ -95,6 +103,7 @@ mod filedes_ring {
         return Ok(Ring {
             read: read,
             write: write,
+            count: 0,
         });
     }
 }
@@ -173,7 +182,8 @@ mod ring_tests {
 
     #[test]
     fn it_can_create_a_ringbuffer() {
-        filedes_ring::new().unwrap();
+        let ring = filedes_ring::new().unwrap();
+        println!("Got a ring: {}", ring);
     }
 
     #[test]
@@ -193,7 +203,7 @@ mod ring_tests {
             }
             count += 1;
         }
-        println!("Reached the limit at {}", count);
+        println!("Reached the limit at {} ring buffers", count);
         assert!(limit_reached);
     }
 }
