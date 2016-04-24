@@ -83,7 +83,14 @@ fn adding_many_to_a_ring_works() {
     let mut closed = 0;
 
     println!("Closing the stashed FDs now...");
-    // TODO: The ring buffer is ~unusable after this
+    for fd in ring.iter() {
+        closed += 1;
+        nix::unistd::close(fd).unwrap();
+    }
+    assert_eq!(should_close, closed);
+
+    closed = 0;
+    println!("Closing the stashed FDs a second time...");
     for fd in ring.iter() {
         closed += 1;
         nix::unistd::close(fd).unwrap();
