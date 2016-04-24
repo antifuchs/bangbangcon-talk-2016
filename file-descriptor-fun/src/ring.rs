@@ -7,7 +7,7 @@ use std::fmt;
 use std::os::unix::io::RawFd;
 
 // OS X doesn't let us go beyond 256kB for the buffer size, so this is the max:
-const SEND_BUF_SIZE: usize = 256 * 1024;
+const SEND_BUF_SIZE: usize = 900 * 1024;
 
 /// A ring buffer containing file descriptors.
 ///
@@ -112,7 +112,14 @@ impl Ring {
         Ok(())
     }
 
-    fn next(&self) -> Result<RawFd> {
+    /// Remove and return the head of the fd ring
+    pub fn pop(&mut self) -> Result<RawFd> {
+        let fd = try!(self.remove());
+        self.count -= 1;
+        Ok(fd)
+    }
+
+    fn remove(&self) -> Result<RawFd> {
         let mut backing_buf = vec![0];
         let mut buf = vec![IoVec::from_mut_slice(&mut backing_buf)];
 
@@ -127,9 +134,7 @@ impl Ring {
                 // TODO: this could probably handle the case of multiple FDs via buffers
                 match fd.len() {
                     1 => {
-                        let the_fd = fd[0];
-                        try!(self.insert(the_fd));
-                        Ok(the_fd)
+                        Ok(fd[0])
                     }
                     0 => Err(Error::Protocol(ProtocolError::NoFDReceived)),
                     _ => Err(Error::Protocol(ProtocolError::TooManyFDsReceived)),
@@ -137,6 +142,12 @@ impl Ring {
             }
             _ => Err(Error::Protocol(ProtocolError::NoFDReceived)),
         }
+    }
+
+    fn next(&self) -> Result<RawFd> {
+        let fd = try!(self.remove());
+        try!(self.insert(fd));
+        Ok(fd)
     }
 
     /// Returns an iterator on the FDs contained in the ring buffer

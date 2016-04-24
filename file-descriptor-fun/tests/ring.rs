@@ -89,11 +89,9 @@ fn adding_many_to_a_ring_works() {
     }
     assert_eq!(should_close, closed);
 
-    closed = 0;
-    println!("Closing the stashed FDs a second time...");
-    for fd in ring.iter() {
-        closed += 1;
+    println!("Closing the stashed FDs a second time, properly...");
+    while ring.count > 0 {
+        let fd = ring.pop().unwrap();
         nix::unistd::close(fd).unwrap();
     }
-    assert_eq!(should_close, closed);
 }
