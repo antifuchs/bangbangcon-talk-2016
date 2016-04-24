@@ -92,13 +92,20 @@ pub fn new() -> Result<Ring> {
 }
 
 impl Ring {
-    /// Adds an FD to a Ring. Closing the FD to free up resources is left to the caller.
+    /// Adds an FD to a Ring, updating the count of contained FDs.
+    /// Closing the FD to free up resources is left to the caller.
+    ///
+    /// # Errors
+    /// * [`Bad(nix::Error)`](enum.Error.html#variant.Bad) - if any unforeseen condition occurs
+    /// * [`Limit(nix::Error)`](enum.Error.html#variant.Limit) - if
+    ///   the socket would block or any other limit runs over.
     pub fn add(&mut self, fd: RawFd) -> Result<()> {
         try!(self.insert(fd));
         self.count += 1;
         Ok(())
     }
 
+    /// (internal) Add an FD to the ring, sending it down the `.write` end.
     fn insert(&self, fd: RawFd) -> Result<()> {
         let buf = vec![IoVec::from_slice("!".as_bytes())];
 
@@ -112,13 +119,14 @@ impl Ring {
         Ok(())
     }
 
-    /// Remove and return the head of the fd ring
+    /// Removes and returns the head of the fd ring, updating count.
     pub fn pop(&mut self) -> Result<RawFd> {
         let fd = try!(self.remove());
         self.count -= 1;
         Ok(fd)
     }
 
+    /// (internal) Removes and returns the head of the ring from `.read`.
     fn remove(&self) -> Result<RawFd> {
         let mut backing_buf = vec![0];
         let mut buf = vec![IoVec::from_mut_slice(&mut backing_buf)];
