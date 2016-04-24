@@ -2,6 +2,7 @@ use nix;
 use nix::sys::socket;
 use nix::sys::uio::IoVec;
 use nix::unistd;
+use std::result;
 use std::fmt;
 use std::os::unix::io::RawFd;
 
@@ -72,8 +73,11 @@ impl From<nix::Error> for Error {
     }
 }
 
+/// A specialized Result type for fd Ring buffer operations.
+pub type Result<T> = result::Result<T, Error>;
+
 // Create a new Ring with a UNIX domain socket pair.
-pub fn new() -> Result<Ring, Error> {
+pub fn new() -> Result<Ring> {
     use super::unix_socket_pair;
 
     let (read, write) = try!(unix_socket_pair());
@@ -89,13 +93,13 @@ pub fn new() -> Result<Ring, Error> {
 
 impl Ring {
     /// Adds an FD to a Ring. Closing the FD to free up resources is left to the caller.
-    pub fn add(&mut self, fd: RawFd) -> Result<(), Error> {
+    pub fn add(&mut self, fd: RawFd) -> Result<()> {
         try!(self.insert(fd));
         self.count += 1;
         Ok(())
     }
 
-    fn insert(&self, fd: RawFd) -> Result<(), Error> {
+    fn insert(&self, fd: RawFd) -> Result<()> {
         let buf = vec![IoVec::from_slice("!".as_bytes())];
 
         let fds = vec![fd];
@@ -108,7 +112,7 @@ impl Ring {
         Ok(())
     }
 
-    fn next(&self) -> Result<RawFd, Error> {
+    fn next(&self) -> Result<RawFd> {
         let mut backing_buf = vec![0];
         let mut buf = vec![IoVec::from_mut_slice(&mut backing_buf)];
 
