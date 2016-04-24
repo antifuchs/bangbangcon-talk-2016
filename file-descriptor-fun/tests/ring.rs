@@ -71,6 +71,9 @@ fn adding_many_to_a_ring_works() {
     println!("...and I opened {} FDs", additional_fds.len());
     assert!(additional_fds.len() > 0);
 
+    // println!("Waiting 60s");
+    // std::thread::sleep(std::time::Duration::from_secs(60));
+
     println!("Closing the additional FDs now...");
     for fd in additional_fds {
         nix::unistd::close(fd).unwrap();
