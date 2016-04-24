@@ -1,15 +1,22 @@
+## Vars
+
+TEST_CMDLINE := cargo test --
+ifeq (1,${TESTBT})
+TEST_CMDLINE_PREFIX := env RUST_BACKTRACE=1
+else
+TEST_CMDLINE_PREFIX := env
+endif
+
+## Targets
+
 .DEFAULT_GOAL := help
 
 test: ## Run the test suite
-	rm -f /tmp/filedes_fun/mysock* ; env RUST_BACKTRACE=1 cargo test
-
-test_print: ## Run the test suite
-	rm -f /tmp/filedes_fun/mysock* ; env RUST_BACKTRACE=1 cargo test -- --nocapture
-
+	rm -f /tmp/filedes_fun/mysock* ; ${TEST_CMDLINE_PREFIX} ${TEST_CMDLINE} ${TESTOPT}
 
 dockertest: ## Run the test suite in a docker container
 	docker build -t current .
-	docker run -ti current
+	docker run -ti current make -C /src test TESTBT="${TESTBT}" TESTOPT="${TESTOPT}"
 
 doc: ## Build docs for this project and its dependencies
 	cargo doc
