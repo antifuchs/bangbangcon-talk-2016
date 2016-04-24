@@ -76,6 +76,8 @@ fn adding_many_to_a_ring_works() {
 
     let should_close = ring.count;
     let mut closed = 0;
+
+    // TODO: The ring buffer is ~unusable after this
     for fd in ring.iter() {
         closed += 1;
         nix::unistd::close(fd).unwrap();

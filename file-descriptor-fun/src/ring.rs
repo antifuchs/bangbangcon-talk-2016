@@ -8,9 +8,16 @@ use std::os::unix::io::RawFd;
 // OS X doesn't let us go beyond 256kB for the buffer size, so this is the max:
 const SEND_BUF_SIZE: usize = (512 - 64) * 1024;
 
+/// A ring buffer containing file descriptors.
+///
+/// You can stuff FDs in with the [`add`](#method.add) method, and
+/// iterate over them one by one using the iterator structure returned
+/// by [`iter`](#method.iter).
 pub struct Ring {
     read: RawFd,
     write: RawFd,
+
+    /// The number of file descriptors contained in the ring buffer.
     pub count: u64,
 }
 
@@ -28,26 +35,28 @@ impl Drop for Ring {
     }
 }
 
-// Any sort of error that can occur while trying to speak the ring
-// buffer protocol
+/// Any sort of error that can occur while trying to speak the ring
+/// buffer protocol
 #[derive(Copy, PartialEq, Eq, Clone, Debug)]
 pub enum ProtocolError {
-    // Expected to receive an FD, but did not get one
+    /// Expected to receive an FD, but did not get one
     NoFDReceived,
 
-    // Expected one FD, got more
+    /// Expected one FD, got more
     TooManyFDsReceived,
 }
 
 #[derive(Debug)]
 pub enum Error {
-    // A real error that prevents the Ring buffer from working
+    /// A real error that prevents the Ring buffer from working
     Bad(nix::Error),
 
-    // An error that indicates some limit being reached. This is sometimes expected and realistic!
+    /// An error that indicates some limit being reached. This is
+    /// sometimes expected and realistic!
     Limit(nix::Error),
 
-    // A protocol error (e.g., messages on the socket didn't have the right format)
+    /// A protocol error (e.g., messages on the socket didn't have the
+    /// right format)
     Protocol(ProtocolError),
 }
 
@@ -79,7 +88,7 @@ pub fn new() -> Result<Ring, Error> {
 }
 
 impl Ring {
-    // Adds an FD to a Ring. Closing the FD to free up resources is left to the caller.
+    /// Adds an FD to a Ring. Closing the FD to free up resources is left to the caller.
     pub fn add(&mut self, fd: RawFd) -> Result<(), Error> {
         try!(self.insert(fd));
         self.count += 1;
@@ -91,19 +100,19 @@ impl Ring {
 
         let fds = vec![fd];
         let cmsgs = vec![socket::ControlMessage::ScmRights(fds.as_slice())];
-        match socket::sendmsg(self.write,
+        try!(socket::sendmsg(self.write,
                               &buf.as_slice(),
                               cmsgs.as_slice(),
                               socket::MsgFlags::empty(),
-                              None) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(From::from(e)),
-        }
+                             None));
+        Ok(())
     }
 
     fn next(&self) -> Result<RawFd, Error> {
         let mut backing_buf = vec![0];
         let mut buf = vec![IoVec::from_mut_slice(&mut backing_buf)];
+
+        // TODO: deal with the constant 15 here.
         let mut cmsg: socket::CmsgSpace<([RawFd; 15])> = socket::CmsgSpace::new();
         match socket::recvmsg(self.read,
                               &mut buf.as_mut_slice(),
@@ -123,8 +132,7 @@ impl Ring {
                             _ => Err(Error::Protocol(ProtocolError::TooManyFDsReceived)),
                         }
                     }
-                    Some(_) => Err(Error::Protocol(ProtocolError::NoFDReceived)),
-                    None => Err(Error::Protocol(ProtocolError::NoFDReceived)),
+                    _ => Err(Error::Protocol(ProtocolError::NoFDReceived)),
                 }
             }
 
@@ -132,6 +140,7 @@ impl Ring {
         }
     }
 
+    /// Returns an iterator on the FDs contained in the ring buffer
     pub fn iter(&self) -> RingIter {
         RingIter {
             ring: &self,
@@ -140,7 +149,7 @@ impl Ring {
     }
 }
 
-// An iterator over the File descriptors contained in an FD ring buffer
+/// An iterator over the File descriptors contained in an FD ring buffer
 pub struct RingIter<'a> {
     ring: &'a Ring,
     offset: u64,
