@@ -6,7 +6,7 @@ use std::fmt;
 use std::os::unix::io::RawFd;
 
 // OS X doesn't let us go beyond 256kB for the buffer size, so this is the max:
-const SEND_BUF_SIZE: usize = (512 - 64) * 1024;
+const SEND_BUF_SIZE: usize = 256 * 1024;
 
 /// A ring buffer containing file descriptors.
 ///
@@ -114,29 +114,24 @@ impl Ring {
 
         // TODO: deal with the constant 15 here.
         let mut cmsg: socket::CmsgSpace<([RawFd; 15])> = socket::CmsgSpace::new();
-        match socket::recvmsg(self.read,
-                              &mut buf.as_mut_slice(),
-                              Some(&mut cmsg),
-                              socket::MsgFlags::empty()) {
-            Ok(msg) => {
-                match msg.cmsgs().next() {
-                    Some(socket::ControlMessage::ScmRights(fd)) => {
-                        // TODO: this could probably handle the case of multiple FDs via buffers
-                        match fd.len() {
-                            1 => {
-                                let the_fd = fd[0];
-                                try!(self.insert(the_fd));
-                                Ok(the_fd)
-                            }
-                            0 => Err(Error::Protocol(ProtocolError::NoFDReceived)),
-                            _ => Err(Error::Protocol(ProtocolError::TooManyFDsReceived)),
-                        }
+        let msg = try!(socket::recvmsg(self.read,
+                                       &mut buf.as_mut_slice(),
+                                       Some(&mut cmsg),
+                                       socket::MsgFlags::empty()));
+        match msg.cmsgs().next() {
+            Some(socket::ControlMessage::ScmRights(fd)) => {
+                // TODO: this could probably handle the case of multiple FDs via buffers
+                match fd.len() {
+                    1 => {
+                        let the_fd = fd[0];
+                        try!(self.insert(the_fd));
+                        Ok(the_fd)
                     }
-                    _ => Err(Error::Protocol(ProtocolError::NoFDReceived)),
+                    0 => Err(Error::Protocol(ProtocolError::NoFDReceived)),
+                    _ => Err(Error::Protocol(ProtocolError::TooManyFDsReceived)),
                 }
             }
-
-            Err(e) => Err(From::from(e)),
+            _ => Err(Error::Protocol(ProtocolError::NoFDReceived)),
         }
     }
 
