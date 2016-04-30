@@ -12,7 +12,6 @@ endif
 .DEFAULT_GOAL := help
 
 test: ## Run the test suite
-	rm -f /tmp/filedes_fun/mysock*
 	bash -c "ulimit -n 5000 ; ${TEST_CMDLINE_PREFIX} ${TEST_CMDLINE} ${TESTOPT}"
 
 dockertest: ## Run the test suite in a docker container

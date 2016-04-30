@@ -23,6 +23,10 @@ pub fn setup() -> io::Result<()> {
     fs::create_dir_all(Path::new(self::BASE_PATH))
 }
 
+pub fn teardown() -> io::Result<()> {
+    fs::remove_dir_all(Path::new(self::BASE_PATH))
+}
+
 fn sockpath(path: &str) -> PathBuf {
     Path::new(BASE_PATH).join(Path::new(path))
 }
