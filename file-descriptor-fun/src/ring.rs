@@ -11,7 +11,7 @@ use std::str::FromStr;
 use std::os::unix::io::RawFd;
 
 // OS X doesn't let us go beyond 256kB for the buffer size, so this is the max:
-const SEND_BUF_SIZE: usize = 900 * 1024;
+const SEND_BUF_SIZE: usize = 100 * 1024;
 
 /// A ring buffer containing file descriptors.
 ///
@@ -29,7 +29,7 @@ pub struct Ring {
 
 impl fmt::Display for Ring {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "#<Ring containing {} fds>", self.count)
+        write!(f, "#<Ring containing {} entries>", self.count)
     }
 }
 
@@ -185,7 +185,7 @@ impl<'a> Ring {
 
     /// (internal) Removes and returns the head of the ring from `.read`.
     fn remove(&self) -> Result<StashedThing> {
-        // I assume we have no more than a 10^500 FDs in there, but haha.
+        // I assume we have no more than a 10^1023 FDs in there, but haha.
         let mut backing_buf: Vec<u8> = vec![0;1024];
 
         // TODO: deal with the constant 15 here.
@@ -197,8 +197,8 @@ impl<'a> Ring {
                                        Some(&mut cmsg),
                                        socket::MsgFlags::empty()));
 
-        let read_bytes = iovs[0].as_slice();
-        println!("Received a message '{:?}'", read_bytes);
+        let read_buffer: &[u8] = iovs[0].as_slice();
+        let read_bytes: &[u8] = &read_buffer[..msg.bytes];
         match msg.cmsgs().next() {
             Some(socket::ControlMessage::ScmRights(fds)) => {
                 // TODO: this could probably handle the case of multiple FDs via buffers
@@ -210,7 +210,9 @@ impl<'a> Ring {
                     }
                     2 => {
                         let count_str = try!(str::from_utf8(read_bytes));
+                        println!("Could parse utf8 {}", count_str);
                         let count: u64 = try!(u64::from_str(count_str));
+                        println!("Could read number {}", count);
                         let ring = Ring{
                             read: fds[0],
                             write: fds[1],

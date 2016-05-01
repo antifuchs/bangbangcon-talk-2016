@@ -34,37 +34,50 @@ fn adding_to_ring_works() {
     }
 }
 
+fn add_two_sockets_to_ring(ring: &mut ring::Ring) -> ring::Result<()> {
+    let (one, two) = try!(filedes::unix_socket_pair());
+    match ring.add(&ring::StashableThing::from(one)) {
+        Ok(()) => {
+            try!(nix::unistd::close(one));
+        }
+        Err(ring::Error::Limit(e)) => {
+            println!("I hit {}", e);
+            try!(nix::unistd::close(one));
+            try!(nix::unistd::close(two));
+            return Err(ring::Error::Limit(e));
+        }
+        Err(e) => {
+            return Err(e);
+        }
+    }
+    match ring.add(&ring::StashableThing::from(two)) {
+        Ok(()) => {
+            try!(nix::unistd::close(two));
+            Ok(())
+        },
+        Err(ring::Error::Limit(e)) => {
+            println!("I hit {}", e);
+            try!(nix::unistd::close(two));
+            return Err(ring::Error::Limit(e));
+        }
+        Err(e) => {
+            return Err(e);
+        }
+    }
+}
+
 #[test]
 fn adding_many_to_a_ring_works() {
     let mut ring = ring::new().unwrap();
 
     loop {
-        let (one, two) = filedes::unix_socket_pair().unwrap();
-        match ring.add(&ring::StashableThing::from(one)) {
-            Ok(()) => {
-                nix::unistd::close(one).unwrap();
-            }
+        match add_two_sockets_to_ring(&mut ring) {
+            Ok(()) => {}
             Err(ring::Error::Limit(e)) => {
                 println!("I hit {}", e);
-                nix::unistd::close(one).unwrap();
                 break;
             }
-            Err(e) => {
-                panic!(e);
-            }
-        }
-        match ring.add(&ring::StashableThing::from(two)) {
-            Ok(()) => {
-                nix::unistd::close(two).unwrap();
-            },
-            Err(ring::Error::Limit(e)) => {
-                println!("I hit {}", e);
-                nix::unistd::close(two).unwrap();
-                break;
-            }
-            Err(e) => {
-                panic!(e);
-            }
+            Err(e) => { panic!(e); }
         }
     }
     let mut additional_fds: Vec<RawFd> = vec!();
