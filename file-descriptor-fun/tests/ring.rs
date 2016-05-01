@@ -14,10 +14,56 @@ fn it_can_create_a_ringbuffer() {
 fn adding_to_ring_works() {
     let mut ring = ring::new().unwrap();
     let (one, two) = filedes::unix_socket_pair().unwrap();
-    ring.add(one).unwrap();
+    ring.add(&ring::StashableThing::from(one)).unwrap();
     assert_eq!(1, ring.count);
-    ring.add(two).unwrap();
+    ring.add(&ring::StashableThing::from(two)).unwrap();
     assert_eq!(2, ring.count);
+
+    let other_ring = ring::new().unwrap();
+    ring.add(&ring::StashableThing::from(&other_ring)).unwrap();
+    assert_eq!(3, ring.count);
+
+    let received = ring.pop().unwrap();
+    match received {
+        ring::StashedThing::One(_) => {
+            println!("Yay!");
+        }
+        _ => {
+            panic!("Huh!");
+        }
+    }
+}
+
+fn add_two_sockets_to_ring(ring: &mut ring::Ring) -> ring::Result<()> {
+    let (one, two) = try!(filedes::unix_socket_pair());
+    match ring.add(&ring::StashableThing::from(one)) {
+        Ok(()) => {
+            try!(nix::unistd::close(one));
+        }
+        Err(ring::Error::Limit(e)) => {
+            println!("I hit {}", e);
+            try!(nix::unistd::close(one));
+            try!(nix::unistd::close(two));
+            return Err(ring::Error::Limit(e));
+        }
+        Err(e) => {
+            return Err(e);
+        }
+    }
+    match ring.add(&ring::StashableThing::from(two)) {
+        Ok(()) => {
+            try!(nix::unistd::close(two));
+            Ok(())
+        },
+        Err(ring::Error::Limit(e)) => {
+            println!("I hit {}", e);
+            try!(nix::unistd::close(two));
+            return Err(ring::Error::Limit(e));
+        }
+        Err(e) => {
+            return Err(e);
+        }
+    }
 }
 
 #[test]
@@ -25,32 +71,13 @@ fn adding_many_to_a_ring_works() {
     let mut ring = ring::new().unwrap();
 
     loop {
-        let (one, two) = filedes::unix_socket_pair().unwrap();
-        match ring.add(one) {
-            Ok(()) => {
-                nix::unistd::close(one).unwrap();
-            }
+        match add_two_sockets_to_ring(&mut ring) {
+            Ok(()) => {}
             Err(ring::Error::Limit(e)) => {
                 println!("I hit {}", e);
-                nix::unistd::close(one).unwrap();
                 break;
             }
-            Err(e) => {
-                panic!(e);
-            }
-        }
-        match ring.add(two) {
-            Ok(()) => {
-                nix::unistd::close(two).unwrap();
-            },
-            Err(ring::Error::Limit(e)) => {
-                println!("I hit {}", e);
-                nix::unistd::close(two).unwrap();
-                break;
-            }
-            Err(e) => {
-                panic!(e);
-            }
+            Err(e) => { panic!(e); }
         }
     }
     let mut additional_fds: Vec<RawFd> = vec!();
@@ -83,15 +110,26 @@ fn adding_many_to_a_ring_works() {
     let mut closed = 0;
 
     println!("Closing the stashed FDs now...");
-    for fd in ring.iter() {
+    for thing in ring.iter() {
         closed += 1;
-        nix::unistd::close(fd).unwrap();
+        match thing {
+            ring::StashedThing::One(fd) => {
+                nix::unistd::close(fd).unwrap();
+            }
+            ring::StashedThing::Pair(_) => {}
+        }
     }
     assert_eq!(should_close, closed);
 
     println!("Closing the stashed FDs a second time, properly...");
     while ring.count > 0 {
-        let fd = ring.pop().unwrap();
-        nix::unistd::close(fd).unwrap();
+        let thing = ring.pop().unwrap();
+        match thing {
+            ring::StashedThing::One(fd) => {
+                nix::unistd::close(fd).unwrap();
+            }
+            ring::StashedThing::Pair(_) => {
+            }
+        }
     }
 }
