@@ -4,6 +4,7 @@ use nix::sys::uio::IoVec;
 use nix::unistd;
 use std::result;
 use std::fmt;
+
 use std::os::unix::io::RawFd;
 
 // OS X doesn't let us go beyond 256kB for the buffer size, so this is the max:
@@ -14,6 +15,7 @@ const SEND_BUF_SIZE: usize = 900 * 1024;
 /// You can stuff FDs in with the [`add`](#method.add) method, and
 /// iterate over them one by one using the iterator structure returned
 /// by [`iter`](#method.iter).
+#[derive(Clone)]
 pub struct Ring {
     read: RawFd,
     write: RawFd,
@@ -91,6 +93,12 @@ pub fn new() -> Result<Ring> {
     });
 }
 
+#[derive(Clone)]
+pub enum StashableThing<'a> {
+    One(RawFd),
+    Pair(&'a Ring),
+}
+
 impl Ring {
     /// Adds an FD to a Ring, updating the count of contained FDs.
     /// Closing the FD to free up resources is left to the caller.
@@ -99,24 +107,40 @@ impl Ring {
     /// * [`Bad(nix::Error)`](enum.Error.html#variant.Bad) - if any unforeseen condition occurs
     /// * [`Limit(nix::Error)`](enum.Error.html#variant.Limit) - if
     ///   the socket would block or any other limit runs over.
-    pub fn add(&mut self, fd: RawFd) -> Result<()> {
-        try!(self.insert(fd));
-        self.count += 1;
+    pub fn add(&mut self, thing: StashableThing) -> Result<()> {
+        let n = try!(self.insert(thing));
+        self.count += n;
         Ok(())
     }
 
-    /// (internal) Add an FD to the ring, sending it down the `.write` end.
-    fn insert(&self, fd: RawFd) -> Result<()> {
-        let buf = vec![IoVec::from_slice("!".as_bytes())];
+    /// (internal) Add an FD to the ring, sending it down the `.write`
+    /// end, and returns the number of entries made
+    fn insert(&self, thing: StashableThing) -> Result<u64> {
+        match thing {
+            StashableThing::One(fd) => {
+                let buf = vec![IoVec::from_slice("!".as_bytes())];
 
-        let fds = vec![fd];
-        let cmsgs = vec![socket::ControlMessage::ScmRights(fds.as_slice())];
-        try!(socket::sendmsg(self.write,
-                              &buf.as_slice(),
-                              cmsgs.as_slice(),
-                              socket::MsgFlags::empty(),
-                             None));
-        Ok(())
+                let fds = vec![fd];
+                let cmsgs = vec![socket::ControlMessage::ScmRights(fds.as_slice())];
+                try!(socket::sendmsg(self.write,
+                                     &buf.as_slice(),
+                                     cmsgs.as_slice(),
+                                     socket::MsgFlags::empty(),
+                                     None));
+            }
+            StashableThing::Pair(ring) => {
+                let str = format!("r:{}", ring.count);
+                let buf = vec![IoVec::from_slice(str.as_bytes())];
+                let fds = vec![ring.read, ring.write];
+                let cmsgs = vec![socket::ControlMessage::ScmRights(fds.as_slice())];
+                try!(socket::sendmsg(self.write,
+                                     &buf.as_slice(),
+                                     cmsgs.as_slice(),
+                                     socket::MsgFlags::empty(),
+                                     None));
+            }
+        }
+        Ok(1)
     }
 
     /// Removes and returns the head of the fd ring, updating count.
@@ -154,7 +178,7 @@ impl Ring {
 
     fn next(&self) -> Result<RawFd> {
         let fd = try!(self.remove());
-        try!(self.insert(fd));
+        try!(self.insert(StashableThing::One(fd)));
         Ok(fd)
     }
 
