@@ -186,7 +186,7 @@ impl<'a> Ring {
     /// (internal) Removes and returns the head of the ring from `.read`.
     fn remove(&self) -> Result<StashedThing> {
         // I assume we have no more than a 10^500 FDs in there, but haha.
-        let mut backing_buf: Vec<u8> = Vec::with_capacity(1024);
+        let mut backing_buf: Vec<u8> = vec![0;1024];
 
         // TODO: deal with the constant 15 here.
         let mut cmsg: socket::CmsgSpace<([RawFd; 15])> = socket::CmsgSpace::new();
