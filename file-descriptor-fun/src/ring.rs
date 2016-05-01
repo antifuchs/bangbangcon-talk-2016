@@ -210,9 +210,7 @@ impl<'a> Ring {
                     }
                     2 => {
                         let count_str = try!(str::from_utf8(read_bytes));
-                        println!("Could parse utf8 {}", count_str);
                         let count: u64 = try!(u64::from_str(count_str));
-                        println!("Could read number {}", count);
                         let ring = Ring{
                             read: fds[0],
                             write: fds[1],
