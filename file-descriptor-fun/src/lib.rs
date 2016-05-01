@@ -4,14 +4,16 @@
 
 //! The top-level module filedes contains convenience / test stuff for playing with file descriptors.
 //!
-//! The most interesting one is probably [`unix_socket_pair`](#fn.unix_socket_pair).
+//! The most interesting one is probably [`unix_socket_pair`](fn.unix_socket_pair.html).
 
 
 extern crate nix;
+extern crate libc;
 
 pub mod ring;
 
 use nix::sys::socket;
+use nix::NixPath;
 use std::path::{Path, PathBuf};
 use std::fs;
 use std::io;
@@ -70,7 +72,12 @@ pub fn unix_socket_pair() -> Result<(RawFd, RawFd), nix::Error> {
 }
 
 /// Creates a new pair of sockets with {unix_socket_pair} and adds it
-/// to the ring, and returns the number of sockets added.
+/// to the ring, and returns the number of sockets added.  This is the
+/// easiest way to get throwaway file descriptor outside wrapping
+/// `libc::mkstemp` (see [`add_tmpfile_to_ring`](fn.add_tmpfile_to_ring.html) for that) (:
+///
+/// This tries to close all file descriptors properly, but probably
+/// fails & leaks them at various points.
 pub fn add_two_sockets_to_ring(ring: &mut ring::Ring) -> ring::Result<u64> {
     let (one, two) = try!(unix_socket_pair());
     match ring.add(&ring::StashableThing::from(one)) {
@@ -98,6 +105,43 @@ pub fn add_two_sockets_to_ring(ring: &mut ring::Ring) -> ring::Result<u64> {
             return Ok(1);
         }
         Err(e) => {
+            return Err(e);
+        }
+    }
+}
+
+fn mkstemp() -> Result<RawFd, nix::Error> {
+    let template = "/tmp/fildes_fun_tmpfile.XXXXXXXXXXX";
+    let res = try!(template.with_nix_path(|cstr| {
+        let owned_cstr = cstr.to_owned();
+        unsafe {
+            libc::mkstemp(owned_cstr.into_raw())
+        }
+    }));
+    let result = try!(nix::Errno::result(res));
+    Ok(result)
+}
+
+/// Uses `mkstemp` to create an open, unlinked temporary file and add
+/// its file descriptor to the [`Ring`](ring/struct.Ring.html)
+/// structure.
+///
+/// This function closes the temporary file descriptor in any case
+/// (successs or error).
+pub fn add_tmpfile_to_ring(ring: &mut ring::Ring) -> ring::Result<u64> {
+    let fd = try!(mkstemp());
+    match ring.add(&ring::StashableThing::from(fd)) {
+        Ok(()) => {
+            try!(nix::unistd::close(fd));
+            Ok(1)
+        }
+        Err(ring::Error::Limit(e)) => {
+            println!("I hit {}", e);
+            try!(nix::unistd::close(fd));
+            return Err(ring::Error::Limit(e));
+        }
+        Err(e) => {
+            try!(nix::unistd::close(fd));
             return Err(e);
         }
     }

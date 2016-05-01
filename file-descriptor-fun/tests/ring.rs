@@ -2,7 +2,7 @@ extern crate filedes;
 extern crate nix;
 
 use filedes::ring;
-use filedes::add_two_sockets_to_ring;
+use filedes::{add_two_sockets_to_ring,add_tmpfile_to_ring};
 use std::os::unix::io::RawFd;
 
 #[test]
@@ -40,7 +40,7 @@ fn adding_many_to_a_ring_works() {
     let mut ring = ring::new().unwrap();
 
     loop {
-        match add_two_sockets_to_ring(&mut ring) {
+        match add_tmpfile_to_ring(&mut ring) {
             Ok(_) => {}
             Err(ring::Error::Limit(e)) => {
                 println!("I hit {}", e);

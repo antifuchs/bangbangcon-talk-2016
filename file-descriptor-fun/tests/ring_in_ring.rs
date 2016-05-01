@@ -2,7 +2,7 @@ extern crate filedes;
 extern crate nix;
 
 use filedes::ring;
-use filedes::add_two_sockets_to_ring;
+use filedes::{add_two_sockets_to_ring,add_tmpfile_to_ring};
 
 // In Linux, this works! We can send rings down rings, and the system
 // will get very very slow, but sockets containing FDs can be sent
@@ -19,7 +19,7 @@ fn adding_rings_to_rings_works() {
     'outer: loop {
         let mut inner_ring = ring::new().unwrap();
         'inner: loop {
-            match add_two_sockets_to_ring(&mut inner_ring) {
+            match add_tmpfile_to_ring(&mut inner_ring) {
                 Ok(n) => { total += n; }
                 Err(ring::Error::Limit(nix::Error::Sys(nix::errno::Errno::EAGAIN))) => {
                     if inner_ring.count > 1 {
