@@ -41,6 +41,7 @@ fn add_two_sockets_to_ring(ring: &mut ring::Ring) -> ring::Result<u64> {
 //
 // In OS X, I'm getting NoFDReceived messages, which indicates to me
 // that the OS is closing those. Ugh!
+#[cfg(not(target_os="macos"))]
 #[test]
 fn adding_rings_to_rings_works() {
     let mut outer_ring = ring::new().unwrap();
