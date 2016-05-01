@@ -2,6 +2,11 @@
 #![deny(warnings)]
 #![crate_type = "lib"]
 
+//! The top-level module filedes contains convenience / test stuff for playing with file descriptors.
+//!
+//! The most interesting one is probably [`unix_socket_pair`](#fn.unix_socket_pair).
+
+
 extern crate nix;
 
 pub mod ring;
@@ -56,10 +61,44 @@ pub fn connect_to_socket(path: &str) -> Result<RawFd, nix::Error> {
     Ok(socket)
 }
 
-// Creates a socketpair in the UNIX domain and returns it
+/// Creates a socketpair in the UNIX domain and returns it.
 pub fn unix_socket_pair() -> Result<(RawFd, RawFd), nix::Error> {
     return socket::socketpair(socket::AddressFamily::Unix,
                               SOCKET_TYPE,
                               SOCKET_PROTO,
                               socket::SOCK_NONBLOCK);
+}
+
+/// Creates a new pair of sockets with {unix_socket_pair} and adds it
+/// to the ring, and returns the number of sockets added.
+pub fn add_two_sockets_to_ring(ring: &mut ring::Ring) -> ring::Result<u64> {
+    let (one, two) = try!(unix_socket_pair());
+    match ring.add(&ring::StashableThing::from(one)) {
+        Ok(()) => {
+            try!(nix::unistd::close(one));
+        }
+        Err(ring::Error::Limit(e)) => {
+            println!("I hit {}", e);
+            try!(nix::unistd::close(one));
+            try!(nix::unistd::close(two));
+            return Err(ring::Error::Limit(e));
+        }
+        Err(e) => {
+            return Err(e);
+        }
+    }
+    match ring.add(&ring::StashableThing::from(two)) {
+        Ok(()) => {
+            try!(nix::unistd::close(two));
+            Ok(2)
+        },
+        Err(ring::Error::Limit(e)) => {
+            println!("I hit {}", e);
+            try!(nix::unistd::close(two));
+            return Ok(1);
+        }
+        Err(e) => {
+            return Err(e);
+        }
+    }
 }

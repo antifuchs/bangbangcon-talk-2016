@@ -2,6 +2,7 @@ extern crate filedes;
 extern crate nix;
 
 use filedes::ring;
+use filedes::add_two_sockets_to_ring;
 use std::os::unix::io::RawFd;
 
 #[test]
@@ -34,45 +35,13 @@ fn adding_to_ring_works() {
     }
 }
 
-fn add_two_sockets_to_ring(ring: &mut ring::Ring) -> ring::Result<()> {
-    let (one, two) = try!(filedes::unix_socket_pair());
-    match ring.add(&ring::StashableThing::from(one)) {
-        Ok(()) => {
-            try!(nix::unistd::close(one));
-        }
-        Err(ring::Error::Limit(e)) => {
-            println!("I hit {}", e);
-            try!(nix::unistd::close(one));
-            try!(nix::unistd::close(two));
-            return Err(ring::Error::Limit(e));
-        }
-        Err(e) => {
-            return Err(e);
-        }
-    }
-    match ring.add(&ring::StashableThing::from(two)) {
-        Ok(()) => {
-            try!(nix::unistd::close(two));
-            Ok(())
-        },
-        Err(ring::Error::Limit(e)) => {
-            println!("I hit {}", e);
-            try!(nix::unistd::close(two));
-            return Err(ring::Error::Limit(e));
-        }
-        Err(e) => {
-            return Err(e);
-        }
-    }
-}
-
 #[test]
 fn adding_many_to_a_ring_works() {
     let mut ring = ring::new().unwrap();
 
     loop {
         match add_two_sockets_to_ring(&mut ring) {
-            Ok(()) => {}
+            Ok(_) => {}
             Err(ring::Error::Limit(e)) => {
                 println!("I hit {}", e);
                 break;

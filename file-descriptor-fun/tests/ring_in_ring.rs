@@ -2,38 +2,7 @@ extern crate filedes;
 extern crate nix;
 
 use filedes::ring;
-
-fn add_two_sockets_to_ring(ring: &mut ring::Ring) -> ring::Result<u64> {
-    let (one, two) = try!(filedes::unix_socket_pair());
-    match ring.add(&ring::StashableThing::from(one)) {
-        Ok(()) => {
-            try!(nix::unistd::close(one));
-        }
-        Err(ring::Error::Limit(e)) => {
-            println!("I hit {}", e);
-            try!(nix::unistd::close(one));
-            try!(nix::unistd::close(two));
-            return Err(ring::Error::Limit(e));
-        }
-        Err(e) => {
-            return Err(e);
-        }
-    }
-    match ring.add(&ring::StashableThing::from(two)) {
-        Ok(()) => {
-            try!(nix::unistd::close(two));
-            Ok(2)
-        },
-        Err(ring::Error::Limit(e)) => {
-            println!("I hit {}", e);
-            try!(nix::unistd::close(two));
-            return Ok(1);
-        }
-        Err(e) => {
-            return Err(e);
-        }
-    }
-}
+use filedes::add_two_sockets_to_ring;
 
 // In Linux, this works! We can send rings down rings, and the system
 // will get very very slow, but sockets containing FDs can be sent
