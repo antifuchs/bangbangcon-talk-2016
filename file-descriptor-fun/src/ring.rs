@@ -11,7 +11,7 @@ use std::str::FromStr;
 use std::os::unix::io::RawFd;
 
 // OS X doesn't let us go beyond 256kB for the buffer size, so this is the max:
-const SEND_BUF_SIZE: usize = 100 * 1024;
+const SEND_BUF_SIZE: usize = 900 * 1024;
 
 /// A ring buffer containing file descriptors.
 ///
