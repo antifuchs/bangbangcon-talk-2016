@@ -4,36 +4,7 @@ extern crate nix;
 use filedes::ring;
 use filedes::{add_two_sockets_to_ring,add_tmpfile_to_ring};
 use std::os::unix::io::RawFd;
-
-#[test]
-fn it_can_create_a_ringbuffer() {
-    let ring = ring::new().unwrap();
-    println!("Got a ring: {}", ring);
-}
-
-#[test]
-fn adding_to_ring_works() {
-    let mut ring = ring::new().unwrap();
-    let (one, two) = filedes::unix_socket_pair().unwrap();
-    ring.add(&ring::StashableThing::from(one)).unwrap();
-    assert_eq!(1, ring.count);
-    ring.add(&ring::StashableThing::from(two)).unwrap();
-    assert_eq!(2, ring.count);
-
-    let other_ring = ring::new().unwrap();
-    ring.add(&ring::StashableThing::from(&other_ring)).unwrap();
-    assert_eq!(3, ring.count);
-
-    let received = ring.pop().unwrap();
-    match received {
-        ring::StashedThing::One(_) => {
-            println!("Yay!");
-        }
-        _ => {
-            panic!("Huh!");
-        }
-    }
-}
+use std::process::Command;
 
 #[test]
 fn adding_many_to_a_ring_works() {
@@ -74,10 +45,15 @@ fn adding_many_to_a_ring_works() {
     for fd in additional_fds {
         nix::unistd::close(fd).unwrap();
     }
+    println!("I still have {} FDs open, but let's see! lsof output follows:", ring.count);
+    let output = Command::new("lsof")
+        .arg("-p")
+        .arg(format!("{}", nix::unistd::getpid()))
+        .output().unwrap();
+    println!("{}", String::from_utf8(output.stdout).unwrap());
 
     let should_close = ring.count;
     let mut closed = 0;
-
     println!("Closing the stashed FDs now...");
     for thing in ring.iter() {
         closed += 1;

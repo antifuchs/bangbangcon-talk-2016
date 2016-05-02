@@ -273,3 +273,35 @@ impl<'a> Iterator for RingIter<'a> {
         }
     }
 }
+
+// Unit tests follow:
+
+#[test]
+fn it_can_create_a_ringbuffer() {
+    let ring = new().unwrap();
+    println!("Got a ring: {}", ring);
+}
+
+#[test]
+fn adding_to_ring_works() {
+    let mut ring = new().unwrap();
+    let (one, two) = super::unix_socket_pair().unwrap();
+    ring.add(&StashableThing::from(one)).unwrap();
+    assert_eq!(1, ring.count);
+    ring.add(&StashableThing::from(two)).unwrap();
+    assert_eq!(2, ring.count);
+
+    let other_ring = new().unwrap();
+    ring.add(&StashableThing::from(&other_ring)).unwrap();
+    assert_eq!(3, ring.count);
+
+    let received = ring.pop().unwrap();
+    match received {
+        StashedThing::One(_) => {
+            println!("Yay!");
+        }
+        _ => {
+            panic!("Huh!");
+        }
+    }
+}
