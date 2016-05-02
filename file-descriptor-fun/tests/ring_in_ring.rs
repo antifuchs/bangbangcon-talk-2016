@@ -3,11 +3,12 @@ extern crate nix;
 
 use filedes::ring;
 use filedes::{add_two_sockets_to_ring,add_tmpfile_to_ring};
+use std::process::Command;
 
-/// Linux gets *really* *really* slow at a certain point, if you put
-/// too many sockets containing FDs into another socket. This number
-/// is super-scientifically chosen to be below that super-slowness
-/// threshold.
+/// Linux gets *really* *really* slow at a certain point (if you put
+/// UNIX domain sockets on the ring buffers). If you should want to
+/// play with `add_two_sockets_to_ring`, you should bump this limit
+/// down to, say, 50.
 const ARBITRARY_LIMIT: u64 = 400;
 
 // In Linux, this works! We can send rings down rings, and the system
@@ -45,7 +46,7 @@ fn adding_rings_to_rings_works() {
                 }
                 Err(ring::Error::Limit(e)) => {
                     println!("I hit {} - this means something global is full, probably", e);
-                    outer_ring.add(&ring::StashableThing::from(&inner_ring)).unwrap();
+                    total -= inner_ring.count;
                     break 'outer;
                 }
                 e => { panic!("Error {:?}", e); }
@@ -56,9 +57,15 @@ fn adding_rings_to_rings_works() {
             break;
         }
     }
-    println!("Assembled an outer ring of {} and a total of {} FDs", outer_ring, total);
+    println!("Assembled an outer ring of {} and a total of {} FDs, lsof output follows:", outer_ring, total);
+    let output = Command::new("lsof")
+        .arg("-p")
+        .arg(format!("{}", nix::unistd::getpid()))
+        .output().unwrap();
+    println!("{}", String::from_utf8(output.stdout).unwrap());
     assert!(outer_ring.count > 1);
 
+    println!("Now I'm going to close all these one by one, hang tight.");
     let mut closed = 0;
     for inner_thing in outer_ring.iter() {
         match inner_thing {
