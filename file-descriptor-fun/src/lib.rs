@@ -126,6 +126,20 @@ fn mkstemp<P: ?Sized + NixPath>(template: &P) -> ring::Result<(RawFd, PathBuf)> 
     Ok((fd, Path::new(OsStr::from_bytes(pathname.as_bytes())).to_owned()))
 }
 
+#[cfg(not(target_os="linux"))]
+fn throwaway_file() -> ring::Result<RawFd> {
+    let (fd, name) = try!(mkstemp("/tmp/filedes_fun.XXXXXXXXXXXX"));
+    nix::unistd::unlink(name.as_path()).unwrap();
+    Ok(fd)
+}
+
+#[cfg(target_os="linux")]
+fn throwaway_file() -> ring::Result<RawFd> {
+    let name = CString::new("foo").unwrap();
+    let fd = try!(nix::sys::memfd::memfd_create(name.as_ref(), nix::sys::memfd::MemFdCreateFlag::empty()));
+    Ok(fd)
+}
+
 /// Uses `mkstemp` to create an open, unlinked temporary file and add
 /// its file descriptor to the [`Ring`](ring/struct.Ring.html)
 /// structure.
@@ -133,8 +147,7 @@ fn mkstemp<P: ?Sized + NixPath>(template: &P) -> ring::Result<(RawFd, PathBuf)> 
 /// This function closes the temporary file descriptor in any case
 /// (successs or error).
 pub fn add_tmpfile_to_ring(ring: &mut ring::Ring) -> ring::Result<u64> {
-    let (fd, name) = try!(mkstemp("/tmp/filedes_fun.XXXXXXXXXXXX"));
-    nix::unistd::unlink(name.as_path()).unwrap();
+    let fd = try!(throwaway_file());
     match ring.add(&ring::StashableThing::from(fd)) {
         Ok(()) => {
             try!(nix::unistd::close(fd));
