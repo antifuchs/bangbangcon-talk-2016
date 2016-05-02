@@ -14,11 +14,12 @@ pub mod ring;
 
 use nix::sys::socket;
 use nix::NixPath;
-use std::ffi::CString;
+use std::ffi::{CString,OsStr};
 use std::path::{Path, PathBuf};
 use std::fs;
 use std::io;
 use std::os::unix::io::RawFd;
+use std::os::unix::ffi::OsStrExt;
 
 const BASE_PATH: &'static str = "/tmp/filedes_fun/";
 const MAX_BACKLOG_QUEUE: usize = 265;
@@ -112,26 +113,17 @@ pub fn add_two_sockets_to_ring(ring: &mut ring::Ring) -> ring::Result<u64> {
 }
 
 /// Returns the FD of an unlinked temporary file.
-///
-/// Note that these are not exactly the `mkstemp(3)` semantics, but
-/// they're convenient here. See
-/// https://github.com/nix-rust/nix/pull/365 for a more complete
-/// implementation.
-fn mkstemp() -> Result<RawFd, nix::Error> {
-    let template = "/tmp/fildes_fun_tmpfile.XXXXXXXXXXX";
-    let res = try!(template.with_nix_path(|cstr| {
-        let mut owned_cstr = cstr.to_owned();
-        let res;
+#[inline]
+fn mkstemp<P: ?Sized + NixPath>(template: &P) -> ring::Result<(RawFd, PathBuf)> {
+    let (fd, pathname) = try!(template.with_nix_path(|path| {
+        let owned_path = path.to_owned();
+        let path_ptr = owned_path.into_raw();
         unsafe {
-            let raw_bytes = owned_cstr.into_raw();
-            res = libc::mkstemp(raw_bytes);
-            owned_cstr = CString::from_raw(raw_bytes);
-            libc::unlink(owned_cstr.as_ptr());
+            (libc::mkstemp(path_ptr), CString::from_raw(path_ptr))
         }
-        res
     }));
-    let result = try!(nix::Errno::result(res));
-    Ok(result)
+    try!(nix::Errno::result(fd));
+    Ok((fd, Path::new(OsStr::from_bytes(pathname.as_bytes())).to_owned()))
 }
 
 /// Uses `mkstemp` to create an open, unlinked temporary file and add
@@ -141,7 +133,8 @@ fn mkstemp() -> Result<RawFd, nix::Error> {
 /// This function closes the temporary file descriptor in any case
 /// (successs or error).
 pub fn add_tmpfile_to_ring(ring: &mut ring::Ring) -> ring::Result<u64> {
-    let fd = try!(mkstemp());
+    let (fd, name) = try!(mkstemp("/tmp/filedes_fun.XXXXXXXXXXXX"));
+    nix::unistd::unlink(name.as_path()).unwrap();
     match ring.add(&ring::StashableThing::from(fd)) {
         Ok(()) => {
             try!(nix::unistd::close(fd));
@@ -153,6 +146,7 @@ pub fn add_tmpfile_to_ring(ring: &mut ring::Ring) -> ring::Result<u64> {
             return Err(ring::Error::Limit(e));
         }
         Err(e) => {
+            println!("I don't understand what {:?} is", e);
             try!(nix::unistd::close(fd));
             return Err(e);
         }

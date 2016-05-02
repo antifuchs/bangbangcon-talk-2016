@@ -38,7 +38,7 @@ fn adding_rings_to_rings_works() {
                     outer_ring.add(&ring::StashableThing::from(&inner_ring)).unwrap();
                     break 'outer;
                 }
-                Err(e) => { panic!(e); }
+                e => { panic!("Error {:?}", e); }
             }
         }
         outer_entries += 1;
