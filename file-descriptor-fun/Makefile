@@ -11,6 +11,9 @@ endif
 
 .DEFAULT_GOAL := help
 
+testall: ## Run the test suite locally and in docker, verbosely
+	make test dockertest TESTBT=1 TESTOPT="--nocapture"
+
 test: ## Run the test suite
 	bash -c "ulimit -n 500 ; ${TEST_CMDLINE_PREFIX} ${TEST_CMDLINE} ${TESTOPT}"
 
