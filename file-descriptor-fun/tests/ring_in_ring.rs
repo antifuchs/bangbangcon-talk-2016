@@ -4,6 +4,12 @@ extern crate nix;
 use filedes::ring;
 use filedes::{add_two_sockets_to_ring,add_tmpfile_to_ring};
 
+/// Linux gets *really* *really* slow at a certain point, if you put
+/// too many sockets containing FDs into another socket. This number
+/// is super-scientifically chosen to be below that super-slowness
+/// threshold.
+const ARBITRARY_LIMIT: u64 = 400;
+
 // In Linux, this works! We can send rings down rings, and the system
 // will get very very slow, but sockets containing FDs can be sent
 // down sockets, and can be read off them.
@@ -26,7 +32,11 @@ fn adding_rings_to_rings_works() {
                         println!("The inner ring is at {}, outer at {}, proceeding to the next stage", inner_ring.count, outer_ring.count);
                         match outer_ring.add(&ring::StashableThing::from(&inner_ring)) {
                             Ok(()) => {}
-                            Err(_) => { break 'outer }
+                            Err(_) => {
+                                // We have to throw away this inner ring, adjust totals for it:
+                                total -= inner_ring.count;
+                                break 'outer
+                            }
                         }
                         break 'inner;
                     } else {
@@ -42,7 +52,7 @@ fn adding_rings_to_rings_works() {
             }
         }
         outer_entries += 1;
-        if outer_entries > 50 {
+        if outer_entries > ARBITRARY_LIMIT {
             break;
         }
     }
