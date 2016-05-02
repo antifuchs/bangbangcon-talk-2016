@@ -14,6 +14,7 @@ pub mod ring;
 
 use nix::sys::socket;
 use nix::NixPath;
+use std::ffi::CString;
 use std::path::{Path, PathBuf};
 use std::fs;
 use std::io;
@@ -110,13 +111,24 @@ pub fn add_two_sockets_to_ring(ring: &mut ring::Ring) -> ring::Result<u64> {
     }
 }
 
+/// Returns the FD of an unlinked temporary file.
+///
+/// Note that these are not exactly the `mkstemp(3)` semantics, but
+/// they're convenient here. See
+/// https://github.com/nix-rust/nix/pull/365 for a more complete
+/// implementation.
 fn mkstemp() -> Result<RawFd, nix::Error> {
     let template = "/tmp/fildes_fun_tmpfile.XXXXXXXXXXX";
     let res = try!(template.with_nix_path(|cstr| {
-        let owned_cstr = cstr.to_owned();
+        let mut owned_cstr = cstr.to_owned();
+        let res;
         unsafe {
-            libc::mkstemp(owned_cstr.into_raw())
+            let raw_bytes = owned_cstr.into_raw();
+            res = libc::mkstemp(raw_bytes);
+            owned_cstr = CString::from_raw(raw_bytes);
+            libc::unlink(owned_cstr.as_ptr());
         }
+        res
     }));
     let result = try!(nix::Errno::result(res));
     Ok(result)
