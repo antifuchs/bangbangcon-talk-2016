@@ -154,7 +154,6 @@ pub fn add_tmpfile_to_ring(ring: &mut ring::Ring) -> ring::Result<u64> {
             Ok(1)
         }
         Err(ring::Error::Limit(e)) => {
-            println!("I hit {}", e);
             try!(nix::unistd::close(fd));
             return Err(ring::Error::Limit(e));
         }

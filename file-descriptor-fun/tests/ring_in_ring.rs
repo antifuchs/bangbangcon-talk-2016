@@ -4,6 +4,8 @@ extern crate nix;
 use filedes::ring;
 use filedes::{add_two_sockets_to_ring,add_tmpfile_to_ring};
 use std::process::Command;
+use std::io;
+use std::io::Write;
 
 /// Linux gets *really* *really* slow at a certain point (if you put
 /// UNIX domain sockets on the ring buffers). If you should want to
@@ -23,6 +25,8 @@ fn adding_rings_to_rings_works() {
     let mut outer_ring = ring::new().unwrap();
     let mut total = 0;
     let mut outer_entries = 0;
+    println!("One dot corresponds to one entry on the outer ring:");
+
     'outer: loop {
         let mut inner_ring = ring::new().unwrap();
         'inner: loop {
@@ -30,7 +34,8 @@ fn adding_rings_to_rings_works() {
                 Ok(n) => { total += n; }
                 Err(ring::Error::Limit(nix::Error::Sys(nix::errno::Errno::EAGAIN))) => {
                     if inner_ring.count > 1 {
-                        println!("The inner ring is at {}, outer at {}, proceeding to the next stage", inner_ring.count, outer_ring.count);
+                        print!(".");
+                        io::stdout().flush().unwrap();
                         match outer_ring.add(&ring::StashableThing::from(&inner_ring)) {
                             Ok(()) => {}
                             Err(_) => {
@@ -45,11 +50,11 @@ fn adding_rings_to_rings_works() {
                     }
                 }
                 Err(ring::Error::Limit(e)) => {
-                    println!("I hit {} - this means something global is full, probably", e);
+                    println!("\nI hit {} - this means something global is full, probably", e);
                     total -= inner_ring.count;
                     break 'outer;
                 }
-                e => { panic!("Error {:?}", e); }
+                e => { panic!("\nError {:?}", e); }
             }
         }
         outer_entries += 1;
@@ -57,7 +62,7 @@ fn adding_rings_to_rings_works() {
             break;
         }
     }
-    println!("Assembled an outer ring of {} and a total of {} FDs, lsof output follows:", outer_ring, total);
+    println!("Assembled an outer ring of {} for a total of {} FDs, lsof output follows:", outer_ring, total);
     let output = Command::new("lsof")
         .arg("-p")
         .arg(format!("{}", nix::unistd::getpid()))
