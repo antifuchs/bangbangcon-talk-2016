@@ -12,7 +12,7 @@ endif
 .DEFAULT_GOAL := help
 
 test: ## Run the test suite
-	bash -c "ulimit -n 5000 ; ${TEST_CMDLINE_PREFIX} ${TEST_CMDLINE} ${TESTOPT}"
+	bash -c "ulimit -n 500 ; ${TEST_CMDLINE_PREFIX} ${TEST_CMDLINE} ${TESTOPT}"
 
 dockertest: ## Run the test suite in a docker container
 	docker build -t current .
