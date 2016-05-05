@@ -1,6 +1,8 @@
 ## Vars
 
-TEST_CMDLINE := cargo test --
+# -j1 prevents the ugly error mishmash from parallel compilation. I
+# guess cargo ought to fix their stuff, but this will do for now:
+TEST_CMDLINE := cargo test -j1 --
 ifeq (1,${TESTBT})
 TEST_CMDLINE_PREFIX := env RUST_BACKTRACE=1
 else
