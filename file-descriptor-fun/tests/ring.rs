@@ -17,7 +17,7 @@ fn adding_many_to_a_ring_works() {
                 println!("I hit {}", e);
                 break;
             }
-            Err(e) => { panic!(e); }
+            Err(e) => { panic!("Oops, {:?}", e); }
         }
     }
     let mut additional_fds: Vec<RawFd> = vec!();

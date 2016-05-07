@@ -73,6 +73,7 @@ impl From<nix::Error> for Error {
     fn from(err: nix::Error) -> Error {
         match err {
             nix::Error::Sys(nix::errno::Errno::EMFILE) => Error::Limit(err),
+            nix::Error::Sys(nix::errno::Errno::ETOOMANYREFS) => Error::Limit(err),
             nix::Error::Sys(nix::errno::Errno::EAGAIN) => Error::Limit(err),
             nix::Error::Sys(nix::errno::Errno::ENFILE) => Error::Limit(err),
             nix::Error::Sys(nix::errno::Errno::ENOSPC) => Error::Limit(err),
