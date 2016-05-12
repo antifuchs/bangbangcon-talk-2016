@@ -94,7 +94,7 @@ I wrote these test programs in Rust (1.8.0), using
 programs are all done as integration-style tests in
 [the tests directory](file-descriptor-fun/tests/).
 
-You can [browse the source](file-descriptor-fun) (if anything isn't clear, I'm very sorry!
+You can [browse the source](file-descriptor-fun/src) (if anything isn't clear, I'm very sorry!
 I'm pretty new to Rust, and I coded under a bit of time pressure. I'll
 try to improve it if you
 [file an issue](https://github.com/antifuchs/bangbangcon-talk-2016/issues/new)!)
@@ -103,7 +103,7 @@ There are some
 [API docs for the ring buffer](https://antifuchs.github.io/bangbangcon-talk-2016/file-descriptor-fun.rustdoc/filedes/ring/index.html)
 in the github pages of this repo.
 
-See the [README.md in filedes-fun](file-descriptor-fun/README.md) for details
+See the [README.md in file-descriptor-fun](file-descriptor-fun/README.md) for details
 on how to run / build this.
 
 ## All the thanks
