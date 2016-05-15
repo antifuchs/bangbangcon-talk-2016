@@ -46,12 +46,18 @@
             <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
                 [<span class='inner'>&#x2212;</span>]
             </a>
-        </span><a id='src-122' class='srclink' href='../../src/filedes/src/ring.rs.html#123-126' title='goto source code'>[src]</a></span></h1>
+        </span><a id='src-130' class='srclink' href='../../src/filedes/src/ring.rs.html#141-149' title='goto source code'>[src]</a></span></h1>
 <pre class='rust enum'>pub enum StashedThing {
     One(<a class='type' href='https://doc.rust-lang.org/nightly/std/sys/ext/io/type.RawFd.html' title='std::sys::ext::io::RawFd'>RawFd</a>),
     Pair(<a class='struct' href='../../filedes/ring/struct.Ring.html' title='filedes::ring::Ring'>Ring</a>),
-}</pre><h2 class='variants'>Variants</h2>
-<table class='variants_table'><tr><td id='variant.One'><code>One</code></td><td></td><td></td></tr><tr><td id='variant.Pair'><code>Pair</code></td><td></td><td></td></tr></table><h2 id='implementations'>Trait Implementations</h2><h3 id='derived_implementations'>Derived Implementations </h3><h3 class='impl'><code>impl <a class='trait' href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html' title='core::clone::Clone'>Clone</a> for <a class='enum' href='../../filedes/ring/enum.StashedThing.html' title='filedes::ring::StashedThing'>StashedThing</a></code></h3><div class='impl-items'><h4 id='method.clone' class='method'><code>fn <a href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#method.clone' class='fnname'>clone</a>(&amp;self) -&gt; <a class='enum' href='../../filedes/ring/enum.StashedThing.html' title='filedes::ring::StashedThing'>StashedThing</a></code></h4>
+}</pre><div class='docblock'><p>StashedThing enumerates all things that can come of of a
+<a href="struct.Ring.html"><code>Ring</code></a> buffer (say, when iterating).</p>
+</div><h2 class='variants'>Variants</h2>
+<table class='variants_table'><tr><td id='variant.One'><code>One</code></td><td><div class='docblock'><p>indicates that the current entry is a single file descriptor</p>
+</div></td><td></td></tr><tr><td id='variant.Pair'><code>Pair</code></td><td><div class='docblock'><p>indicates that the current entry is another ring buffer
+(compatibility note: Stashing ring buffers does not work on
+BSD-alikes like OS X).</p>
+</div></td><td></td></tr></table><h2 id='implementations'>Trait Implementations</h2><h3 id='derived_implementations'>Derived Implementations </h3><h3 class='impl'><code>impl <a class='trait' href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html' title='core::clone::Clone'>Clone</a> for <a class='enum' href='../../filedes/ring/enum.StashedThing.html' title='filedes::ring::StashedThing'>StashedThing</a></code></h3><div class='impl-items'><h4 id='method.clone' class='method'><code>fn <a href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#method.clone' class='fnname'>clone</a>(&amp;self) -&gt; <a class='enum' href='../../filedes/ring/enum.StashedThing.html' title='filedes::ring::StashedThing'>StashedThing</a></code></h4>
 <h4 id='method.clone_from' class='method'><span class="since">1.0.0</span><code>fn <a href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#method.clone_from' class='fnname'>clone_from</a>(&amp;mut self, source: &amp;Self)</code></h4>
 </div></section>
     <section id='search' class="content hidden"></section>

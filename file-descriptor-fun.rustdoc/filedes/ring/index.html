@@ -46,7 +46,7 @@
             <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
                 [<span class='inner'>&#x2212;</span>]
             </a>
-        </span><a id='src-6' class='srclink' href='../../src/filedes/src/ring.rs.html#1-308' title='goto source code'>[src]</a></span></h1>
+        </span><a id='src-6' class='srclink' href='../../src/filedes/src/ring.rs.html#1-321' title='goto source code'>[src]</a></span></h1>
 <h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
 <table>
                     <tr class=' module-item'>
@@ -87,7 +87,9 @@ buffer protocol</p>
                         <td><a class='enum' href='enum.StashableThing.html'
                                title='filedes::ring::StashableThing'>StashableThing</a></td>
                         <td class='docblock short'>
-                             
+                             <p>StashableThing enumerates all the things that can go &quot;into&quot; a
+<a href="struct.Ring.html"><code>Ring</code></a> buffer. Most methods / functions will
+specify an <code>Into&lt;StashableThing&gt;</code> type.</p>
                         </td>
                     </tr>
                 
@@ -95,7 +97,8 @@ buffer protocol</p>
                         <td><a class='enum' href='enum.StashedThing.html'
                                title='filedes::ring::StashedThing'>StashedThing</a></td>
                         <td class='docblock short'>
-                             
+                             <p>StashedThing enumerates all things that can come of of a
+<a href="struct.Ring.html"><code>Ring</code></a> buffer (say, when iterating).</p>
                         </td>
                     </tr>
                 </table><h2 id='functions' class='section-header'><a href="#functions">Functions</a></h2>
