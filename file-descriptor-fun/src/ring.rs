@@ -113,17 +113,15 @@ pub fn new() -> Result<Ring> {
     });
 }
 
+/// StashableThing enumerates all the things that can go "into" a
+/// [`Ring`](struct.Ring.html) buffer. Most methods / functions will
+/// specify an `Into<StashableThing>` type.
 #[derive(Clone)]
 pub enum StashableThing<'a> {
     One(RawFd),
     Pair(&'a Ring),
 }
 
-#[derive(Clone)]
-pub enum StashedThing {
-    One(RawFd),
-    Pair(Ring)
-}
 
 impl<'a> From<RawFd> for StashableThing<'a> {
     fn from(fd: RawFd) -> StashableThing<'a> {
@@ -137,6 +135,12 @@ impl<'a> From<&'a Ring> for StashableThing<'a> {
     }
 }
 
+#[derive(Clone)]
+pub enum StashedThing {
+    One(RawFd),
+    Pair(Ring)
+}
+
 impl<'a> Ring {
     /// Adds an FD to a Ring, updating the count of contained FDs.
     /// Closing the FD to free up resources is left to the caller.
@@ -145,7 +149,7 @@ impl<'a> Ring {
     /// * [`Bad(nix::Error)`](enum.Error.html#variant.Bad) - if any unforeseen condition occurs
     /// * [`Limit(nix::Error)`](enum.Error.html#variant.Limit) - if
     ///   the socket would block or any other limit runs over.
-    pub fn add(&mut self, thing: &StashableThing) -> Result<()> {
+    pub fn add<T: Into<StashableThing<'a>>>(&mut self, thing: T) -> Result<()> {
         let n = try!(self.insert(thing));
         self.count += n;
         Ok(())
@@ -153,16 +157,16 @@ impl<'a> Ring {
 
     /// (internal) Add an FD to the ring, sending it down the `.write`
     /// end, and returns the number of entries made
-    fn insert(&self, thing: &StashableThing) -> Result<u64> {
+    fn insert<T: Into<StashableThing<'a>>>(&self, thing: T) -> Result<u64> {
         let mut msg = String::from("");
         let mut fds: Vec<RawFd> = vec![];
         let mut buf: Vec<IoVec<&[u8]>> = vec![];
-        match thing {
-            &StashableThing::One(fd) => {
+        match thing.into() {
+            StashableThing::One(fd) => {
                 msg.push('!');
                 fds.push(fd);
             }
-            &StashableThing::Pair(ring) => {
+            StashableThing::Pair(ring) => {
                 msg.push_str(format!("{}", ring.count).as_str());
                 fds.push(ring.read);
                 fds.push(ring.write);
@@ -233,11 +237,11 @@ impl<'a> Ring {
         let thing = try!(self.remove());
         match thing {
             StashedThing::One(fd) => {
-                try!(self.insert(&StashableThing::from(fd)));
+                try!(self.insert(fd));
                 Ok(StashedThing::One(fd))
             }
             StashedThing::Pair(ring) => {
-                try!(self.insert(&StashableThing::from(&ring)));
+                try!(self.insert(&ring));
                 Ok(StashedThing::Pair(ring))
             }
         }
@@ -287,13 +291,13 @@ fn it_can_create_a_ringbuffer() {
 fn adding_to_ring_works() {
     let mut ring = new().unwrap();
     let (one, two) = super::unix_socket_pair().unwrap();
-    ring.add(&StashableThing::from(one)).unwrap();
+    ring.add(one).unwrap();
     assert_eq!(1, ring.count);
-    ring.add(&StashableThing::from(two)).unwrap();
+    ring.add(two).unwrap();
     assert_eq!(2, ring.count);
 
     let other_ring = new().unwrap();
-    ring.add(&StashableThing::from(&other_ring)).unwrap();
+    ring.add(&other_ring).unwrap();
     assert_eq!(3, ring.count);
 
     let received = ring.pop().unwrap();

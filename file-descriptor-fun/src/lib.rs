@@ -82,7 +82,7 @@ pub fn unix_socket_pair() -> Result<(RawFd, RawFd), nix::Error> {
 /// fails & leaks them at various points.
 pub fn add_two_sockets_to_ring(ring: &mut ring::Ring) -> ring::Result<u64> {
     let (one, two) = try!(unix_socket_pair());
-    match ring.add(&ring::StashableThing::from(one)) {
+    match ring.add(one) {
         Ok(()) => {
             try!(nix::unistd::close(one));
         }
@@ -96,7 +96,7 @@ pub fn add_two_sockets_to_ring(ring: &mut ring::Ring) -> ring::Result<u64> {
             return Err(e);
         }
     }
-    match ring.add(&ring::StashableThing::from(two)) {
+    match ring.add(two) {
         Ok(()) => {
             try!(nix::unistd::close(two));
             Ok(2)
@@ -148,7 +148,7 @@ fn throwaway_file() -> ring::Result<RawFd> {
 /// (successs or error).
 pub fn add_tmpfile_to_ring(ring: &mut ring::Ring) -> ring::Result<u64> {
     let fd = try!(throwaway_file());
-    match ring.add(&ring::StashableThing::from(fd)) {
+    match ring.add(fd) {
         Ok(()) => {
             try!(nix::unistd::close(fd));
             Ok(1)
