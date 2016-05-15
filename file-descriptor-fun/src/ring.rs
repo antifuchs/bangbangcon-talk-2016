@@ -141,6 +141,16 @@ pub enum StashedThing {
     Pair(Ring)
 }
 
+impl<'a> From<&'a StashedThing> for StashableThing<'a> {
+    #[inline]
+    fn from(thing: &'a StashedThing) -> StashableThing<'a> {
+        match thing {
+            &StashedThing::One(fd) => StashableThing::One(fd),
+            &StashedThing::Pair(ref ring) => StashableThing::Pair(&ring)
+        }
+    }
+}
+
 impl<'a> Ring {
     /// Adds an FD to a Ring, updating the count of contained FDs.
     /// Closing the FD to free up resources is left to the caller.
@@ -234,16 +244,13 @@ impl<'a> Ring {
     }
 
     fn next(&self) -> Result<StashedThing> {
-        let thing = try!(self.remove());
-        match thing {
-            StashedThing::One(fd) => {
-                try!(self.insert(fd));
-                Ok(StashedThing::One(fd))
+        let stashed_thing = self.remove();
+        match stashed_thing {
+            Ok(thing) => {
+                try!(self.insert(&thing));
+                Ok(thing)
             }
-            StashedThing::Pair(ring) => {
-                try!(self.insert(&ring));
-                Ok(StashedThing::Pair(ring))
-            }
+            Err(e) => { Err(e) }
         }
     }
 
