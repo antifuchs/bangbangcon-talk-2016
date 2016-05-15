@@ -244,14 +244,9 @@ impl<'a> Ring {
     }
 
     fn next(&self) -> Result<StashedThing> {
-        let stashed_thing = self.remove();
-        match stashed_thing {
-            Ok(thing) => {
-                try!(self.insert(&thing));
-                Ok(thing)
-            }
-            Err(e) => { Err(e) }
-        }
+        let thing = try!(self.remove());
+        try!(self.insert(&thing));
+        Ok(thing)
     }
 
     /// Returns an iterator on the FDs contained in the ring buffer
