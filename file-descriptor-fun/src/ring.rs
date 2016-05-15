@@ -139,7 +139,12 @@ impl<'a> From<&'a Ring> for StashableThing<'a> {
 /// [`Ring`](struct.Ring.html) buffer (say, when iterating).
 #[derive(Clone)]
 pub enum StashedThing {
+    /// indicates that the current entry is a single file descriptor
     One(RawFd),
+
+    /// indicates that the current entry is another ring buffer
+    /// (compatibility note: Stashing ring buffers does not work on
+    /// BSD-alikes like OS X).
     Pair(Ring)
 }
 
