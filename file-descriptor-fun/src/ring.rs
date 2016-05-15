@@ -135,6 +135,8 @@ impl<'a> From<&'a Ring> for StashableThing<'a> {
     }
 }
 
+/// StashedThing enumerates all things that can come of of a
+/// [`Ring`](struct.Ring.html) buffer (say, when iterating).
 #[derive(Clone)]
 pub enum StashedThing {
     One(RawFd),
