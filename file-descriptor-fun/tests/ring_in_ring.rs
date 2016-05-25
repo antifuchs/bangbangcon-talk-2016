@@ -36,7 +36,7 @@ fn adding_rings_to_rings_works() {
                     if inner_ring.count > 1 {
                         print!(".");
                         io::stdout().flush().unwrap();
-                        match outer_ring.add(&ring::StashableThing::from(&inner_ring)) {
+                        match outer_ring.add(&inner_ring) {
                             Ok(()) => {}
                             Err(_) => {
                                 // We have to throw away this inner ring, adjust totals for it:
