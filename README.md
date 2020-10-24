@@ -9,12 +9,7 @@ You can find my slides and presenter notes in three formats:
 * [PDF](2016%20-%20!!con%20-%20file%20descriptors.pdf)
 * [HTML (no presenter notes)](https://antifuchs.github.io/bangbangcon-talk-2016/2016%20-%20!!con%20-%20file%20descriptors)
 
-You can also watch a(n as yet unedited) video of my talk
-[in the livestream recordings](https://youtu.be/ieGFbsFkIFE?t=4h33m49s). The
-recordings are not available in Germany, for copyright-y reasons (some
-background music triggered a filter, I guess?). I hope the edited
-versions will be!
-
+The talk is online too: [YouTube](https://www.youtube.com/watch?v=_XgXCVULj0o).
 
 ## Background / how does this even work
 
